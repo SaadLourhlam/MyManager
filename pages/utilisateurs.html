@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Utilisateurs - MyManager</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/crud.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
+</head>
+<body>
+    <script src="../assets/js/data-manager.js"></script>
+<div class="crud-container">
+    <div class="crud-header">
+        <div class="crud-title">
+            <h1>Gestion des Utilisateurs</h1>
+            <p>Gérez les comptes utilisateurs et permissions</p>
+        </div>
+        <div class="crud-actions">
+            <button class="btn btn-primary" onclick="openAddUserForm()">+ Ajouter un Utilisateur</button>
+            <button class="btn btn-light" onclick="exportUsersCSV()">📥 Exporter CSV</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-container">
+        <div class="search-bar">
+            <input type="text" id="searchUsers" placeholder="Rechercher un utilisateur...">
+        </div>
+        <div class="filter-group">
+            <label for="roleFilter">Rôle:</label>
+            <select id="roleFilter">
+                <option value="">Tous</option>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="agent">Agent</option>
+                <option value="user">Utilisateur</option>
+            </select>
+        </div>
+        <div class="sort-control">
+            <span>Trier par:</span>
+            <select id="sortUsers">
+                <option value="name">Nom</option>
+                <option value="role">Rôle</option>
+                <option value="status">Statut</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Nom d'utilisateur</th>
+                    <th>Rôle</th>
+                    <th>Statut</th>
+                    <th>Date de création</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="usersPagination"></div>
+</div>
+
+<!-- Modal -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <h2 id="modalTitle">Ajouter un Utilisateur</h2>
+        <form id="userForm" class="form-container">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="userName">Nom Complet *</label>
+                    <input type="text" id="userName" required>
+                </div>
+                <div class="form-group">
+                    <label for="userEmail">Email *</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="userUsername">Nom d'utilisateur *</label>
+                    <input type="text" id="userUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="userRole">Rôle *</label>
+                    <select id="userRole" required>
+                        <option value="">-- Sélectionner --</option>
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="agent">Agent</option>
+                        <option value="user">Utilisateur</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="userStatus">Statut *</label>
+                <select id="userStatus" required>
+                    <option value="">-- Sélectionner --</option>
+                    <option value="actif">Actif</option>
+                    <option value="inactif">Inactif</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" class="btn btn-light" onclick="closeUserModal()">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for viewing user details -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        <div id="detailsContent"></div>
+    </div>
+</div>
+
+<script>
+    let usersData = [...dataManager.utilisateurs];
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let editingId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderUsersTable();
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        document.getElementById('searchUsers').addEventListener('input', filterAndRender);
+        document.getElementById('roleFilter').addEventListener('change', filterAndRender);
+        document.getElementById('sortUsers').addEventListener('change', filterAndRender);
+        document.getElementById('userForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveUser();
+        });
+        document.querySelector('.modal-close').addEventListener('click', closeUserModal);
+    }
+
+    function filterAndRender() {
+        const searchTerm = document.getElementById('searchUsers').value.toLowerCase();
+        const roleFilter = document.getElementById('roleFilter').value;
+        const sortBy = document.getElementById('sortUsers').value;
+
+        usersData = dataManager.utilisateurs.filter(user => {
+            const matchSearch = user.name.toLowerCase().includes(searchTerm) ||
+                              user.email.toLowerCase().includes(searchTerm) ||
+                              user.username.toLowerCase().includes(searchTerm);
+            const matchRole = !roleFilter || user.role === roleFilter;
+            return matchSearch && matchRole;
+        });
+
+        if (sortBy === 'name') {
+            usersData.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortBy === 'role') {
+            usersData.sort((a, b) => a.role.localeCompare(b.role));
+        } else if (sortBy === 'status') {
+            usersData.sort((a, b) => a.status.localeCompare(b.status));
+        }
+
+        currentPage = 1;
+        renderUsersTable();
+    }
+
+    function renderUsersTable() {
+        const tbody = document.querySelector('#usersTable tbody');
+        tbody.innerHTML = '';
+
+        if (usersData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div>Aucun utilisateur trouvé</div></td></tr>';
+            document.getElementById('usersPagination').innerHTML = '';
+            return;
+        }
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = usersData.slice(start, end);
+
+        pageData.forEach(user => {
+            const statusClass = 'status-badge ' + user.status;
+            const roleClass = 'status-badge ' + user.role;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${user.name}</strong></td>
+                <td>${user.email}</td>
+                <td>${user.username}</td>
+                <td><span class="${roleClass}">${user.role}</span></td>
+                <td><span class="${statusClass}">${user.status}</span></td>
+                <td>${user.createdAt}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action" onclick="viewUserDetails(${user.id})">Voir</button>
+                        <button class="btn-action" onclick="editUser(${user.id})">Éditer</button>
+                        <button class="btn-action delete" onclick="deleteUser(${user.id})">Supprimer</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        renderPagination();
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(usersData.length / itemsPerPage);
+        const pagination = document.getElementById('usersPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Précédent';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderUsersTable();
+            }
+        };
+        pagination.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.className = currentPage === i ? 'active' : '';
+            pageBtn.onclick = () => {
+                currentPage = i;
+                renderUsersTable();
+            };
+            pagination.appendChild(pageBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Suivant →';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderUsersTable();
+            }
+        };
+        pagination.appendChild(nextBtn);
+    }
+
+    function openAddUserForm() {
+        editingId = null;
+        document.getElementById('modalTitle').textContent = 'Ajouter un Utilisateur';
+        document.getElementById('userForm').reset();
+        document.getElementById('userModal').classList.add('active');
+    }
+
+    function editUser(id) {
+        const user = dataManager.utilisateurs.find(u => u.id === id);
+        if (!user) return;
+
+        editingId = id;
+        document.getElementById('modalTitle').textContent = 'Modifier l\'Utilisateur';
+        document.getElementById('userName').value = user.name;
+        document.getElementById('userEmail').value = user.email;
+        document.getElementById('userUsername').value = user.username;
+        document.getElementById('userRole').value = user.role;
+        document.getElementById('userStatus').value = user.status;
+        document.getElementById('userModal').classList.add('active');
+    }
+
+    function saveUser() {
+        const name = document.getElementById('userName').value;
+        const email = document.getElementById('userEmail').value;
+        const username = document.getElementById('userUsername').value;
+        const role = document.getElementById('userRole').value;
+        const status = document.getElementById('userStatus').value;
+
+        if (editingId) {
+            const user = dataManager.utilisateurs.find(u => u.id === editingId);
+            if (user) {
+                user.name = name;
+                user.email = email;
+                user.username = username;
+                user.role = role;
+                user.status = status;
+            }
+        } else {
+            const newUser = {
+                id: Math.max(...dataManager.utilisateurs.map(u => u.id), 0) + 1,
+                name,
+                email,
+                username,
+                role,
+                status,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+            dataManager.utilisateurs.push(newUser);
+        }
+
+        closeUserModal();
+        filterAndRender();
+    }
+
+    function deleteUser(id) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?')) {
+            dataManager.utilisateurs = dataManager.utilisateurs.filter(u => u.id !== id);
+            filterAndRender();
+        }
+    }
+
+    function viewUserDetails(id) {
+        const user = dataManager.utilisateurs.find(u => u.id === id);
+        if (!user) return;
+
+        const html = `
+            <h2>Détails de l'Utilisateur</h2>
+            <div class="detail-item">
+                <label>Nom Complet:</label>
+                <p>${user.name}</p>
+            </div>
+            <div class="detail-item">
+                <label>Email:</label>
+                <p>${user.email}</p>
+            </div>
+            <div class="detail-item">
+                <label>Rôle:</label>
+                <p>${user.role}</p>
+            </div>
+            <div class="detail-item">
+                <label>Département:</label>
+                <p>${user.department}</p>
+            </div>
+            <div class="detail-item">
+                <label>Statut:</label>
+                <p><span class="status-badge status-${user.status}">${user.status}</span></p>
+            </div>
+            <div class="detail-item">
+                <label>Date d'ajout:</label>
+                <p>${user.createdAt}</p>
+            </div>
+        `;
+        document.getElementById('detailsContent').innerHTML = html;
+        document.getElementById('detailsModal').classList.add('active');
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    function closeUserModal() {
+        document.getElementById('userModal').classList.remove('active');
+        document.getElementById('userForm').reset();
+        editingId = null;
+    }
+
+    function exportUsersCSV() {
+        let csv = 'Nom,Email,Nom d\'utilisateur,Rôle,Statut,Date de création\n';
+        usersData.forEach(user => {
+            csv += `"${user.name}","${user.email}","${user.username}","${user.role}","${user.status}","${user.createdAt}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'utilisateurs.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('userModal').addEventListener('click', (e) => {
+        if (e.target.id === 'userModal') {
+            closeUserModal();
+        }
+    });
+</script>
+</body>
+</html>

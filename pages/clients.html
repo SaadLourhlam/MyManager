@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clients - MyManager</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/crud.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
+</head>
+<body>
+    <script src="../assets/js/data-manager.js"></script>
+<div class="crud-container">
+    <div class="crud-header">
+        <div class="crud-title">
+            <h1>Gestion des Clients</h1>
+            <p>Gérez vos clients et leurs informations</p>
+        </div>
+        <div class="crud-actions">
+            <button class="btn btn-primary" onclick="openAddClientForm()">+ Ajouter un Client</button>
+            <button class="btn btn-light" onclick="exportClientsCSV()">📥 Exporter CSV</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-container">
+        <div class="search-bar">
+            <input type="text" id="searchClients" placeholder="Rechercher un client...">
+        </div>
+        <div class="filter-group">
+            <label for="statusFilter">Statut:</label>
+            <select id="statusFilter">
+                <option value="">Tous</option>
+                <option value="actif">Actif</option>
+                <option value="inactif">Inactif</option>
+                <option value="en attente">En attente</option>
+            </select>
+        </div>
+        <div class="sort-control">
+            <span>Trier par:</span>
+            <select id="sortClients">
+                <option value="name">Nom</option>
+                <option value="date">Date d'ajout</option>
+                <option value="status">Statut</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table id="clientsTable">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Téléphone</th>
+                    <th>Ville</th>
+                    <th>Statut</th>
+                    <th>Date d'ajout</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="clientsPagination">
+        <!-- Populated by JavaScript -->
+    </div>
+</div>
+
+<!-- Modal for adding/editing client -->
+<div id="clientModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <h2 id="modalTitle">Ajouter un Client</h2>
+        <form id="clientForm" class="form-container">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="clientName">Nom Complet *</label>
+                    <input type="text" id="clientName" required>
+                </div>
+                <div class="form-group">
+                    <label for="clientEmail">Email *</label>
+                    <input type="email" id="clientEmail" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="clientPhone">Téléphone</label>
+                    <input type="tel" id="clientPhone">
+                </div>
+                <div class="form-group">
+                    <label for="clientCity">Ville</label>
+                    <input type="text" id="clientCity">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="clientStatus">Statut *</label>
+                <select id="clientStatus" required>
+                    <option value="">-- Sélectionner --</option>
+                    <option value="actif">Actif</option>
+                    <option value="inactif">Inactif</option>
+                    <option value="en attente">En attente</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" class="btn btn-light" onclick="closeClientModal()">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for viewing client details -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        <div id="detailsContent"></div>
+    </div>
+</div>
+
+<script>
+    let clientsData = [...dataManager.clients];
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let editingId = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        renderClientsTable();
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        document.getElementById('searchClients').addEventListener('input', (e) => {
+            filterAndRender();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', () => {
+            filterAndRender();
+        });
+
+        document.getElementById('sortClients').addEventListener('change', () => {
+            filterAndRender();
+        });
+
+        document.getElementById('clientForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveClient();
+        });
+
+        document.querySelector('.modal-close').addEventListener('click', closeClientModal);
+    }
+
+    function filterAndRender() {
+        const searchTerm = document.getElementById('searchClients').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        const sortBy = document.getElementById('sortClients').value;
+
+        clientsData = dataManager.clients.filter(client => {
+            const matchSearch = client.name.toLowerCase().includes(searchTerm) ||
+                              client.email.toLowerCase().includes(searchTerm) ||
+                              client.city.toLowerCase().includes(searchTerm);
+            const matchStatus = !statusFilter || client.status === statusFilter;
+            return matchSearch && matchStatus;
+        });
+
+        // Sort
+        if (sortBy === 'name') {
+            clientsData.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortBy === 'date') {
+            clientsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        } else if (sortBy === 'status') {
+            clientsData.sort((a, b) => a.status.localeCompare(b.status));
+        }
+
+        currentPage = 1;
+        renderClientsTable();
+    }
+
+    function renderClientsTable() {
+        const tbody = document.querySelector('#clientsTable tbody');
+        tbody.innerHTML = '';
+
+        if (clientsData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div>Aucun client trouvé</div></td></tr>';
+            document.getElementById('clientsPagination').innerHTML = '';
+            return;
+        }
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = clientsData.slice(start, end);
+
+        pageData.forEach(client => {
+            const statusClass = 'status-badge ' + client.status.replace(' ', '-');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${client.name}</strong></td>
+                <td>${client.email}</td>
+                <td>${client.phone}</td>
+                <td>${client.city}</td>
+                <td><span class="${statusClass}">${client.status}</span></td>
+                <td>${client.createdAt}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action" onclick="viewClientDetails(${client.id})">Voir</button>
+                        <button class="btn-action" onclick="editClient(${client.id})">Éditer</button>
+                        <button class="btn-action delete" onclick="deleteClient(${client.id})">Supprimer</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        renderPagination();
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(clientsData.length / itemsPerPage);
+        const pagination = document.getElementById('clientsPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        // Previous button
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Précédent';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderClientsTable();
+            }
+        };
+        pagination.appendChild(prevBtn);
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.className = currentPage === i ? 'active' : '';
+            pageBtn.onclick = () => {
+                currentPage = i;
+                renderClientsTable();
+            };
+            pagination.appendChild(pageBtn);
+        }
+
+        // Next button
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Suivant →';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderClientsTable();
+            }
+        };
+        pagination.appendChild(nextBtn);
+    }
+
+    function openAddClientForm() {
+        editingId = null;
+        document.getElementById('modalTitle').textContent = 'Ajouter un Client';
+        document.getElementById('clientForm').reset();
+        document.getElementById('clientModal').classList.add('active');
+    }
+
+    function editClient(id) {
+        const client = dataManager.clients.find(c => c.id === id);
+        if (!client) return;
+
+        editingId = id;
+        document.getElementById('modalTitle').textContent = 'Modifier un Client';
+        document.getElementById('clientName').value = client.name;
+        document.getElementById('clientEmail').value = client.email;
+        document.getElementById('clientPhone').value = client.phone;
+        document.getElementById('clientCity').value = client.city;
+        document.getElementById('clientStatus').value = client.status;
+        document.getElementById('clientModal').classList.add('active');
+    }
+
+    function saveClient() {
+        const name = document.getElementById('clientName').value;
+        const email = document.getElementById('clientEmail').value;
+        const phone = document.getElementById('clientPhone').value;
+        const city = document.getElementById('clientCity').value;
+        const status = document.getElementById('clientStatus').value;
+
+        if (editingId) {
+            const client = dataManager.clients.find(c => c.id === editingId);
+            if (client) {
+                client.name = name;
+                client.email = email;
+                client.phone = phone;
+                client.city = city;
+                client.status = status;
+            }
+        } else {
+            const newClient = {
+                id: Math.max(...dataManager.clients.map(c => c.id), 0) + 1,
+                name,
+                email,
+                phone,
+                city,
+                status,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+            dataManager.clients.push(newClient);
+        }
+
+        closeClientModal();
+        filterAndRender();
+    }
+
+    function deleteClient(id) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce client?')) {
+            dataManager.clients = dataManager.clients.filter(c => c.id !== id);
+            filterAndRender();
+        }
+    }
+
+    function viewClientDetails(id) {
+        const client = dataManager.clients.find(c => c.id === id);
+        if (!client) return;
+
+        const html = `
+            <h2>Détails du Client</h2>
+            <div class="detail-item">
+                <label>Nom Complet:</label>
+                <p>${client.name}</p>
+            </div>
+            <div class="detail-item">
+                <label>Email:</label>
+                <p>${client.email}</p>
+            </div>
+            <div class="detail-item">
+                <label>Téléphone:</label>
+                <p>${client.phone || '-'}</p>
+            </div>
+            <div class="detail-item">
+                <label>Ville:</label>
+                <p>${client.city || '-'}</p>
+            </div>
+            <div class="detail-item">
+                <label>Statut:</label>
+                <p><span class="status-badge status-${client.status}">${client.status}</span></p>
+            </div>
+            <div class="detail-item">
+                <label>Date d'ajout:</label>
+                <p>${client.createdAt}</p>
+            </div>
+        `;
+        document.getElementById('detailsContent').innerHTML = html;
+        document.getElementById('detailsModal').classList.add('active');
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    function closeClientModal() {
+        document.getElementById('clientModal').classList.remove('active');
+        document.getElementById('clientForm').reset();
+        editingId = null;
+    }
+
+    function exportClientsCSV() {
+        let csv = 'Nom,Email,Téléphone,Ville,Statut,Date d\'ajout\n';
+        clientsData.forEach(client => {
+            csv += `"${client.name}","${client.email}","${client.phone}","${client.city}","${client.status}","${client.createdAt}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'clients.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Close modal on outside click
+    document.getElementById('clientModal').addEventListener('click', (e) => {
+        if (e.target.id === 'clientModal') {
+            closeClientModal();
+        }
+    });
+    </script>
+</body>
+</html>

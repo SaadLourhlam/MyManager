@@ -1,0 +1,84 @@
+# .gitignore - MyManager Backoffice
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE et Editeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+*.log
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Fichiers de build
+dist/
+build/
+out/
+
+# Fichiers système
+.env
+.env.local
+.env.*.local
+.cache
+.parcel-cache
+.eslintcache
+
+# OS specifique
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Fichiers de test
+coverage/
+.nyc_output/
+.mocha-js-runner-cache/
+
+# Fichiers locaux
+local_settings.py
+*.pyc
+__pycache__/
+
+# Fichiers de développement local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Fichiers de base de données
+*.db
+*.sqlite
+*.sqlite3
+
+# Fichiers de configuration personnelle
+config.local.js
+secrets.json
+credentials.json
+
+# Fichiers générés automatiquement
+.generated/
+dist/
+build/

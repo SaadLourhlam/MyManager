@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commandes - MyManager</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/crud.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
+</head>
+<body>
+    <script src="../assets/js/data-manager.js"></script>
+<div class="crud-container">
+    <div class="crud-header">
+        <div class="crud-title">
+            <h1>Gestion des Commandes</h1>
+            <p>Suivez vos commandes clients</p>
+        </div>
+        <div class="crud-actions">
+            <button class="btn btn-primary" onclick="openAddOrderForm()">+ Nouvelle Commande</button>
+            <button class="btn btn-light" onclick="exportOrdersCSV()">📥 Exporter CSV</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-container">
+        <div class="search-bar">
+            <input type="text" id="searchOrders" placeholder="Rechercher une commande...">
+        </div>
+        <div class="filter-group">
+            <label for="statusFilter">Statut:</label>
+            <select id="statusFilter">
+                <option value="">Tous</option>
+                <option value="en cours">En cours</option>
+                <option value="livrée">Livrée</option>
+                <option value="en attente">En attente</option>
+                <option value="annulée">Annulée</option>
+            </select>
+        </div>
+        <div class="sort-control">
+            <span>Trier par:</span>
+            <select id="sortOrders">
+                <option value="date">Date</option>
+                <option value="amount">Montant</option>
+                <option value="status">Statut</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table id="ordersTable">
+            <thead>
+                <tr>
+                    <th>Numéro</th>
+                    <th>Client</th>
+                    <th>Montant</th>
+                    <th>Statut</th>
+                    <th>Date</th>
+                    <th>Nombre d'articles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="ordersPagination"></div>
+</div>
+
+<!-- Modal -->
+<div id="orderModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <h2 id="modalTitle">Nouvelle Commande</h2>
+        <form id="orderForm" class="form-container">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="orderClient">Client *</label>
+                    <select id="orderClient" required>
+                        <option value="">-- Sélectionner --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="orderStatus">Statut *</label>
+                    <select id="orderStatus" required>
+                        <option value="">-- Sélectionner --</option>
+                        <option value="en cours">En cours</option>
+                        <option value="livrée">Livrée</option>
+                        <option value="en attente">En attente</option>
+                        <option value="annulée">Annulée</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="orderAmount">Montant total *</label>
+                <input type="number" id="orderAmount" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="orderDate">Date *</label>
+                <input type="date" id="orderDate" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" class="btn btn-light" onclick="closeOrderModal()">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for viewing order details -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        <div id="detailsContent"></div>
+    </div>
+</div>
+
+<script>
+    let ordersData = [...dataManager.commandes];
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let editingId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        populateClientSelect();
+        renderOrdersTable();
+        setupEventListeners();
+    });
+
+    function populateClientSelect() {
+        const select = document.getElementById('orderClient');
+        dataManager.clients.forEach(client => {
+            const option = document.createElement('option');
+            option.value = client.id;
+            option.textContent = client.name;
+            select.appendChild(option);
+        });
+    }
+
+    function setupEventListeners() {
+        document.getElementById('searchOrders').addEventListener('input', filterAndRender);
+        document.getElementById('statusFilter').addEventListener('change', filterAndRender);
+        document.getElementById('sortOrders').addEventListener('change', filterAndRender);
+        document.getElementById('orderForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveOrder();
+        });
+        document.querySelector('.modal-close').addEventListener('click', closeOrderModal);
+    }
+
+    function filterAndRender() {
+        const searchTerm = document.getElementById('searchOrders').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        const sortBy = document.getElementById('sortOrders').value;
+
+        ordersData = dataManager.commandes.filter(order => {
+            const client = dataManager.clients.find(c => c.id === order.clientId);
+            const clientName = client ? client.name : '';
+            const matchSearch = order.id.toString().includes(searchTerm) || clientName.toLowerCase().includes(searchTerm);
+            const matchStatus = !statusFilter || order.status === statusFilter;
+            return matchSearch && matchStatus;
+        });
+
+        if (sortBy === 'date') {
+            ordersData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        } else if (sortBy === 'amount') {
+            ordersData.sort((a, b) => b.totalAmount - a.totalAmount);
+        } else if (sortBy === 'status') {
+            ordersData.sort((a, b) => a.status.localeCompare(b.status));
+        }
+
+        currentPage = 1;
+        renderOrdersTable();
+    }
+
+    function renderOrdersTable() {
+        const tbody = document.querySelector('#ordersTable tbody');
+        tbody.innerHTML = '';
+
+        if (ordersData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div>Aucune commande trouvée</div></td></tr>';
+            document.getElementById('ordersPagination').innerHTML = '';
+            return;
+        }
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = ordersData.slice(start, end);
+
+        pageData.forEach(order => {
+            const client = dataManager.clients.find(c => c.id === order.clientId);
+            const clientName = client ? client.name : 'Inconnu';
+            const statusClass = 'status-badge ' + order.status.replace(' ', '-');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>#${order.id}</strong></td>
+                <td>${clientName}</td>
+                <td><strong>${order.totalAmount.toFixed(2)} €</strong></td>
+                <td><span class="${statusClass}">${order.status}</span></td>
+                <td>${order.date}</td>
+                <td>${order.items.length}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action" onclick="viewOrderDetails(${order.id})">Voir</button>
+                        <button class="btn-action" onclick="editOrder(${order.id})">Éditer</button>
+                        <button class="btn-action delete" onclick="deleteOrder(${order.id})">Supprimer</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        renderPagination();
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(ordersData.length / itemsPerPage);
+        const pagination = document.getElementById('ordersPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Précédent';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderOrdersTable();
+            }
+        };
+        pagination.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.className = currentPage === i ? 'active' : '';
+            pageBtn.onclick = () => {
+                currentPage = i;
+                renderOrdersTable();
+            };
+            pagination.appendChild(pageBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Suivant →';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderOrdersTable();
+            }
+        };
+        pagination.appendChild(nextBtn);
+    }
+
+    function openAddOrderForm() {
+        editingId = null;
+        document.getElementById('modalTitle').textContent = 'Nouvelle Commande';
+        document.getElementById('orderForm').reset();
+        document.getElementById('orderDate').valueAsDate = new Date();
+        document.getElementById('orderModal').classList.add('active');
+    }
+
+    function editOrder(id) {
+        const order = dataManager.commandes.find(o => o.id === id);
+        if (!order) return;
+
+        editingId = id;
+        document.getElementById('modalTitle').textContent = 'Modifier la Commande';
+        document.getElementById('orderClient').value = order.clientId;
+        document.getElementById('orderStatus').value = order.status;
+        document.getElementById('orderAmount').value = order.totalAmount;
+        document.getElementById('orderDate').value = order.date;
+        document.getElementById('orderModal').classList.add('active');
+    }
+
+    function saveOrder() {
+        const clientId = parseInt(document.getElementById('orderClient').value);
+        const status = document.getElementById('orderStatus').value;
+        const amount = parseFloat(document.getElementById('orderAmount').value);
+        const date = document.getElementById('orderDate').value;
+
+        if (editingId) {
+            const order = dataManager.commandes.find(o => o.id === editingId);
+            if (order) {
+                order.clientId = clientId;
+                order.status = status;
+                order.totalAmount = amount;
+                order.date = date;
+            }
+        } else {
+            const newOrder = {
+                id: Math.max(...dataManager.commandes.map(o => o.id), 0) + 1,
+                clientId,
+                status,
+                totalAmount: amount,
+                date,
+                items: []
+            };
+            dataManager.commandes.push(newOrder);
+        }
+
+        closeOrderModal();
+        filterAndRender();
+    }
+
+    function deleteOrder(id) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer cette commande?')) {
+            dataManager.commandes = dataManager.commandes.filter(o => o.id !== id);
+            filterAndRender();
+        }
+    }
+
+    function viewOrderDetails(id) {
+        const order = dataManager.commandes.find(o => o.id === id);
+        if (!order) return;
+
+        const html = `
+            <h2>Détails de la Commande</h2>
+            <div class="detail-item">
+                <label>Numéro de Commande:</label>
+                <p>${order.number}</p>
+            </div>
+            <div class="detail-item">
+                <label>Client:</label>
+                <p>${order.client}</p>
+            </div>
+            <div class="detail-item">
+                <label>Montant Total:</label>
+                <p>${order.total} €</p>
+            </div>
+            <div class="detail-item">
+                <label>Nombre de Produits:</label>
+                <p>${order.items}</p>
+            </div>
+            <div class="detail-item">
+                <label>Statut:</label>
+                <p><span class="status-badge status-${order.status}">${order.status}</span></p>
+            </div>
+            <div class="detail-item">
+                <label>Date de Commande:</label>
+                <p>${order.date}</p>
+            </div>
+        `;
+        document.getElementById('detailsContent').innerHTML = html;
+        document.getElementById('detailsModal').classList.add('active');
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    function closeOrderModal() {
+        document.getElementById('orderModal').classList.remove('active');
+        document.getElementById('orderForm').reset();
+        editingId = null;
+    }
+
+    function exportOrdersCSV() {
+        let csv = 'Numéro,Client,Montant,Statut,Date,Articles\n';
+        ordersData.forEach(order => {
+            const client = dataManager.clients.find(c => c.id === order.clientId);
+            const clientName = client ? client.name : 'Inconnu';
+            csv += `"${order.id}","${clientName}","${order.totalAmount}","${order.status}","${order.date}","${order.items.length}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'commandes.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('orderModal').addEventListener('click', (e) => {
+        if (e.target.id === 'orderModal') {
+            closeOrderModal();
+        }
+    });
+</script>
+</body>
+</html>

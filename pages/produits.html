@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produits - MyManager</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/crud.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
+</head>
+<body>
+    <script src="../assets/js/data-manager.js"></script>
+<div class="crud-container">
+    <div class="crud-header">
+        <div class="crud-title">
+            <h1>Gestion des Produits</h1>
+            <p>Gérez votre catalogue de produits</p>
+        </div>
+        <div class="crud-actions">
+            <button class="btn btn-primary" onclick="openAddProductForm()">+ Ajouter un Produit</button>
+            <button class="btn btn-light" onclick="exportProductsCSV()">📥 Exporter CSV</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-container">
+        <div class="search-bar">
+            <input type="text" id="searchProducts" placeholder="Rechercher un produit...">
+        </div>
+        <div class="filter-group">
+            <label for="categoryFilter">Catégorie:</label>
+            <select id="categoryFilter">
+                <option value="">Toutes</option>
+                <option value="Électronique">Électronique</option>
+                <option value="Accessoires">Accessoires</option>
+            </select>
+        </div>
+        <div class="sort-control">
+            <span>Trier par:</span>
+            <select id="sortProducts">
+                <option value="name">Nom</option>
+                <option value="price">Prix</option>
+                <option value="stock">Stock</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table id="productsTable">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Catégorie</th>
+                    <th>Prix</th>
+                    <th>Stock</th>
+                    <th>Description</th>
+                    <th>Date d'ajout</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="productsPagination"></div>
+</div>
+
+<!-- Modal -->
+<div id="productModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <h2 id="modalTitle">Ajouter un Produit</h2>
+        <form id="productForm" class="form-container">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="productName">Nom *</label>
+                    <input type="text" id="productName" required>
+                </div>
+                <div class="form-group">
+                    <label for="productCategory">Catégorie *</label>
+                    <select id="productCategory" required>
+                        <option value="">-- Sélectionner --</option>
+                        <option value="Électronique">Électronique</option>
+                        <option value="Accessoires">Accessoires</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="productPrice">Prix *</label>
+                    <input type="number" id="productPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="productStock">Stock *</label>
+                    <input type="number" id="productStock" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="productDescription">Description</label>
+                <textarea id="productDescription" rows="4"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" class="btn btn-light" onclick="closeProductModal()">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for viewing product details -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        <div id="detailsContent"></div>
+    </div>
+</div>
+
+<script>
+    let productsData = [...dataManager.produits];
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let editingId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderProductsTable();
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        document.getElementById('searchProducts').addEventListener('input', filterAndRender);
+        document.getElementById('categoryFilter').addEventListener('change', filterAndRender);
+        document.getElementById('sortProducts').addEventListener('change', filterAndRender);
+        document.getElementById('productForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveProduct();
+        });
+        document.querySelector('.modal-close').addEventListener('click', closeProductModal);
+    }
+
+    function filterAndRender() {
+        const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const sortBy = document.getElementById('sortProducts').value;
+
+        productsData = dataManager.produits.filter(product => {
+            const matchSearch = product.name.toLowerCase().includes(searchTerm) ||
+                              product.description.toLowerCase().includes(searchTerm);
+            const matchCategory = !categoryFilter || product.category === categoryFilter;
+            return matchSearch && matchCategory;
+        });
+
+        if (sortBy === 'name') {
+            productsData.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortBy === 'price') {
+            productsData.sort((a, b) => a.price - b.price);
+        } else if (sortBy === 'stock') {
+            productsData.sort((a, b) => a.stock - b.stock);
+        }
+
+        currentPage = 1;
+        renderProductsTable();
+    }
+
+    function renderProductsTable() {
+        const tbody = document.querySelector('#productsTable tbody');
+        tbody.innerHTML = '';
+
+        if (productsData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div>Aucun produit trouvé</div></td></tr>';
+            document.getElementById('productsPagination').innerHTML = '';
+            return;
+        }
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = productsData.slice(start, end);
+
+        pageData.forEach(product => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${product.name}</strong></td>
+                <td>${product.category}</td>
+                <td><strong>${product.price.toFixed(2)} €</strong></td>
+                <td><span class="status-badge ${product.stock > 50 ? 'actif' : 'en-attente'}">${product.stock}</span></td>
+                <td>${product.description}</td>
+                <td>${product.createdAt}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action" onclick="viewProductDetails(${product.id})">Voir</button>
+                        <button class="btn-action" onclick="editProduct(${product.id})">Éditer</button>
+                        <button class="btn-action delete" onclick="deleteProduct(${product.id})">Supprimer</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        renderPagination();
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(productsData.length / itemsPerPage);
+        const pagination = document.getElementById('productsPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Précédent';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderProductsTable();
+            }
+        };
+        pagination.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.className = currentPage === i ? 'active' : '';
+            pageBtn.onclick = () => {
+                currentPage = i;
+                renderProductsTable();
+            };
+            pagination.appendChild(pageBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Suivant →';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderProductsTable();
+            }
+        };
+        pagination.appendChild(nextBtn);
+    }
+
+    function openAddProductForm() {
+        editingId = null;
+        document.getElementById('modalTitle').textContent = 'Ajouter un Produit';
+        document.getElementById('productForm').reset();
+        document.getElementById('productModal').classList.add('active');
+    }
+
+    function editProduct(id) {
+        const product = dataManager.produits.find(p => p.id === id);
+        if (!product) return;
+
+        editingId = id;
+        document.getElementById('modalTitle').textContent = 'Modifier un Produit';
+        document.getElementById('productName').value = product.name;
+        document.getElementById('productCategory').value = product.category;
+        document.getElementById('productPrice').value = product.price;
+        document.getElementById('productStock').value = product.stock;
+        document.getElementById('productDescription').value = product.description;
+        document.getElementById('productModal').classList.add('active');
+    }
+
+    function saveProduct() {
+        const name = document.getElementById('productName').value;
+        const category = document.getElementById('productCategory').value;
+        const price = parseFloat(document.getElementById('productPrice').value);
+        const stock = parseInt(document.getElementById('productStock').value);
+        const description = document.getElementById('productDescription').value;
+
+        if (editingId) {
+            const product = dataManager.produits.find(p => p.id === editingId);
+            if (product) {
+                product.name = name;
+                product.category = category;
+                product.price = price;
+                product.stock = stock;
+                product.description = description;
+            }
+        } else {
+            const newProduct = {
+                id: Math.max(...dataManager.produits.map(p => p.id), 0) + 1,
+                name,
+                category,
+                price,
+                stock,
+                description,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+            dataManager.produits.push(newProduct);
+        }
+
+        closeProductModal();
+        filterAndRender();
+    }
+
+    function deleteProduct(id) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce produit?')) {
+            dataManager.produits = dataManager.produits.filter(p => p.id !== id);
+            filterAndRender();
+        }
+    }
+
+    function viewProductDetails(id) {
+        const product = dataManager.produits.find(p => p.id === id);
+        if (!product) return;
+
+        const html = `
+            <h2>Détails du Produit</h2>
+            <div class="detail-item">
+                <label>Nom:</label>
+                <p>${product.name}</p>
+            </div>
+            <div class="detail-item">
+                <label>Catégorie:</label>
+                <p>${product.category}</p>
+            </div>
+            <div class="detail-item">
+                <label>Prix Unitaire:</label>
+                <p>${product.price} €</p>
+            </div>
+            <div class="detail-item">
+                <label>Stock:</label>
+                <p>${product.stock} unités</p>
+            </div>
+            <div class="detail-item">
+                <label>Description:</label>
+                <p>${product.description || '-'}</p>
+            </div>
+            <div class="detail-item">
+                <label>Date d'ajout:</label>
+                <p>${product.createdAt}</p>
+            </div>
+        `;
+        document.getElementById('detailsContent').innerHTML = html;
+        document.getElementById('detailsModal').classList.add('active');
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    function closeProductModal() {
+        document.getElementById('productModal').classList.remove('active');
+        document.getElementById('productForm').reset();
+        editingId = null;
+    }
+
+    function exportProductsCSV() {
+        let csv = 'Nom,Catégorie,Prix,Stock,Description,Date d\'ajout\n';
+        productsData.forEach(product => {
+            csv += `"${product.name}","${product.category}","${product.price}","${product.stock}","${product.description}","${product.createdAt}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'produits.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('productModal').addEventListener('click', (e) => {
+        if (e.target.id === 'productModal') {
+            closeProductModal();
+        }
+    });
+</script>
+</body>
+</html>

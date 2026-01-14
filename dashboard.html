@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyManager - Tableau de Bord</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+<body class="dashboard-page">
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <div class="logo-navbar">
+                <span>MM</span>
+                <span id="brandName">MyManager</span>
+            </div>
+        </div>
+
+        <div class="navbar-center">
+            <h2 id="pageTitle">Tableau de Bord</h2>
+        </div>
+
+        <div class="navbar-right">
+            <div class="language-dropdown">
+                <button class="lang-toggle" id="langToggle">
+                    <span id="currentLang">FR</span>
+                </button>
+                <div class="lang-menu">
+                    <button data-lang="fr">Français</button>
+                    <button data-lang="en">English</button>
+                    <button data-lang="ar">العربية</button>
+                </div>
+            </div>
+
+            <div class="user-dropdown">
+                <button class="user-menu-toggle">
+                    <div class="user-avatar">A</div>
+                    <span id="userName">Admin</span>
+                </button>
+                <div class="user-menu">
+                    <a href="#" id="profileLink" onclick="alert('Profil non disponible'); return false;">
+                        <span>👤</span> <span id="myProfileText">Mon Profil</span>
+                    </a>
+                    <a href="#" id="settingsLink" onclick="alert('Paramètres non disponibles'); return false;">
+                        <span>⚙️</span> <span id="settingsText">Paramètres</span>
+                    </a>
+                    <hr>
+                    <a href="#" id="logoutLink">
+                        <span>🚪</span> <span id="logoutText">Déconnexion</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-main">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3 id="menuTitle">Menu</h3>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <span class="icon">📊</span>
+                    <span id="dashboardNav">Tableau de Bord</span>
+                </a>
+                <a href="#clients" class="nav-item" data-page="clients">
+                    <span class="icon">👥</span>
+                    <span id="clientsNav">Clients</span>
+                </a>
+                <a href="#produits" class="nav-item" data-page="produits">
+                    <span class="icon">📦</span>
+                    <span id="produitsNav">Produits</span>
+                </a>
+                <a href="#commandes" class="nav-item" data-page="commandes">
+                    <span class="icon">📋</span>
+                    <span id="commandesNav">Commandes</span>
+                </a>
+                <a href="#utilisateurs" class="nav-item" data-page="utilisateurs">
+                    <span class="icon">👤</span>
+                    <span id="utilisateursNav">Utilisateurs</span>
+                </a>
+                <a href="#factures" class="nav-item" data-page="factures">
+                    <span class="icon">💰</span>
+                    <span id="facturesNav">Factures</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p id="versionText">v1.0.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page-content active">
+                <div class="page-header">
+                    <h1 id="dashboardTitle">Tableau de Bord</h1>
+                    <p id="dashboardDesc">Bienvenue sur votre tableau de bord</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            👥
+                        </div>
+                        <div class="stat-content">
+                            <p id="totalClientsLabel">Clients Totaux</p>
+                            <h3 id="totalClients">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            📦
+                        </div>
+                        <div class="stat-content">
+                            <p id="totalProduitsLabel">Produits</p>
+                            <h3 id="totalProduits">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            📋
+                        </div>
+                        <div class="stat-content">
+                            <p id="totalCommandesLabel">Commandes</p>
+                            <h3 id="totalCommandes">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                            💰
+                        </div>
+                        <div class="stat-content">
+                            <p id="totalRevenueLabel">Revenu Total</p>
+                            <h3 id="totalRevenue">0 €</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                            ⭐
+                        </div>
+                        <div class="stat-content">
+                            <p id="totalUsersLabel">Utilisateurs Actifs</p>
+                            <h3 id="totalUsers">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3 id="revenueChartTitle">Revenu par Mois</h3>
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 id="statusChartTitle">Statut des Commandes</h3>
+                        <canvas id="statusChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 id="categoriesChartTitle">Top Produits</h3>
+                        <canvas id="categoriesChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 id="usersChartTitle">Croissance Utilisateurs</h3>
+                        <canvas id="usersChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 id="salesChartTitle">Distribution des Ventes</h3>
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Activities -->
+                <div class="recent-activities">
+                    <h3 id="recentActivitiesTitle">Activités Récentes</h3>
+                    <div id="activitiesList" class="activities-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Page -->
+            <div id="clients-page" class="page-content">
+                <iframe src="pages/clients.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+
+            <!-- Produits Page -->
+            <div id="produits-page" class="page-content">
+                <iframe src="pages/produits.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+
+            <!-- Commandes Page -->
+            <div id="commandes-page" class="page-content">
+                <iframe src="pages/commandes.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+
+            <!-- Utilisateurs Page -->
+            <div id="utilisateurs-page" class="page-content">
+                <iframe src="pages/utilisateurs.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+
+            <!-- Factures Page -->
+            <div id="factures-page" class="page-content">
+                <iframe src="pages/factures.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Details -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="assets/js/translations.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/data-manager.js"></script>
+    <script src="assets/js/ui-manager.js"></script>
+    <script src="assets/js/charts.js"></script>
+    <script src="assets/js/advanced-features.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+</body>
+</html>
